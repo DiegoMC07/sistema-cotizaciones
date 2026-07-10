@@ -97,6 +97,36 @@ let projectData = null;
 let currentTab = 'REPORTE';
 let saveTimer = null;
 
+let debounceTimer;
+
+// --- NUEVO: FUNCIONES PARA EL CATÁLOGO DE MARCAS ---
+const marcasCargadas = {};
+
+function obtenerCategoriaMarca(codigoSeccion) {
+    const mapa = { 'E_CONTROL': 'control', 'E_ELECTRICO': 'electrico', 'E_NEUMATICO': 'neumatico' };
+    return mapa[codigoSeccion] || 'general';
+}
+
+async function cargarMarcasPorCategoria(codigoSeccion) {
+    const categoria = obtenerCategoriaMarca(codigoSeccion);
+    if (marcasCargadas[categoria]) return; // Si ya se cargaron, no repetimos
+    try {
+        const res = await fetch(`/api/marcas?categoria=${categoria}`);
+        const data = await res.json();
+        
+        const datalist = document.createElement('datalist');
+        datalist.id = `list-marcas-${categoria}`;
+        data.marcas.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            datalist.appendChild(opt);
+        });
+        document.body.appendChild(datalist);
+        marcasCargadas[categoria] = true;
+    } catch (e) { console.error("Error al cargar marcas", e); }
+}
+// ---------------------------------------------------
+
 function getTC() { return parseFloat(document.getElementById('f-tc').value)||20; }
 
 function updateTabStyles() {
@@ -148,13 +178,33 @@ async function loadProject() {
   try {
     const r = await api(`/api/proyecto/${PID}`);
     projectData = r;
+    
+    // --- NUEVO: INTEGRACIÓN DE CATÁLOGO DE MARCAS ---
+    // Recorremos las secciones y precargamos las marcas si son de tipo 'equipo'
+    if (projectData.secciones && Array.isArray(projectData.secciones)) {
+        projectData.secciones.forEach(sec => {
+            // Verificamos si la sección requiere catálogo (ajusta el tipo si es necesario)
+            if (sec.tipo === 'equipo') { 
+                cargarMarcasPorCategoria(sec.codigo);
+            }
+        });
+    }
+    // ------------------------------------------------
+
     updateStatusBar();
     switchTab(currentTab);
+    
   } catch(e) {
-    const r2 = await api(`/api/proyecto/${PID}`).catch(async()=> await api(`/api/proyecto/${PID}`).catch(async()=>{
-      const res = await fetch(`/api/proyecto/${PID}`);
-      return res.json();
-    }));
+    console.error("Error al cargar el proyecto:", e);
+    // Mantenemos tu lógica de reintento de carga
+    try {
+        const res = await fetch(`/api/proyecto/${PID}`);
+        projectData = await res.json();
+        updateStatusBar();
+        switchTab(currentTab);
+    } catch(err) {
+        console.error("Fallo definitivo al cargar el proyecto", err);
+    }
   }
 }
 
@@ -175,6 +225,18 @@ async function initProject() {
     const res = await fetch(`/api/proyecto/${PID}`);
     if (!res.ok) throw new Error('Error al cargar');
     projectData = await res.json();
+    
+    // --- NUEVO: PRECARGA DE MARCAS ---
+    if (projectData.secciones && Array.isArray(projectData.secciones)) {
+        projectData.secciones.forEach(sec => {
+            // Si no es mano de obra, asumimos que es equipo y necesita marcas
+            if (sec.tipo !== 'mano_obra') { 
+                cargarMarcasPorCategoria(sec.codigo);
+            }
+        });
+    }
+    // ---------------------------------
+
     updateStatusBar();
     switchTab(currentTab);
   } catch(e) {
@@ -182,6 +244,7 @@ async function initProject() {
       `<div class="text-center py-5 text-danger fw-bold"><i class="fa-solid fa-circle-exclamation fs-3 mb-2 d-block"></i>Error al cargar. Verifica MySQL en XAMPP.</div>`;
   }
 }
+
 
 function switchTab(code) {
   currentTab = code;
@@ -403,17 +466,24 @@ function renderEquipo(c, sec) {
   const partidas = sec.partidas||[];
   let totalMN=0,totalUSD=0;
   let rows='';
+  
+  // Obtenemos la categoría para el datalist (ej: 'control', 'electrico', 'neumatico')
+  const catMarca = obtenerCategoriaMarca(sec.codigo);
+  
   partidas.forEach((p,i)=>{
     const qty=parseFloat(p.cantidad||0),pr=parseFloat(p.precio_lista||0),m=parseFloat(p.porcentaje_mgn||0),mon=p.moneda||'MN';
     const sub=qty*pr; let tmn,tusd;
     if(mon==='USD'){tusd=sub*(1+m/100);tmn=tusd*getTC();}
     else{tmn=sub*(1+m/100);tusd=getTC()?tmn/getTC():0;}
     totalMN+=tmn; totalUSD+=tusd;
+    
     rows+=`
       <tr id="eq-row-${p.id}" class="table-row">
         <td class="text-center text-muted" style="font-size:12px">${p.numero_partida||i+1}</td>
         <td><input class="excel-input" value="${esc(p.descripcion||'')}" data-field="descripcion" onchange="saveEQ(${p.id})" style="min-width:160px"/></td>
-        <td><input class="excel-input" value="${esc(p.marca||'')}" data-field="marca" onchange="saveEQ(${p.id})" style="width:80px"/></td>
+        
+        <td><input class="excel-input" value="${esc(p.marca||'')}" data-field="marca" onchange="saveEQ(${p.id})" style="width:80px" list="list-marcas-${catMarca}"/></td>
+        
         <td><input class="excel-input" value="${esc(p.modelo||'')}" data-field="modelo" onchange="saveEQ(${p.id})" style="width:80px"/></td>
         <td><input class="excel-input" type="number" value="${qty||''}" data-field="cantidad" oninput="recalcEQ(${p.id},this)" style="width:55px" step="1"/></td>
         <td><input class="excel-input" type="number" value="${pr||''}" data-field="precio_lista" oninput="recalcEQ(${p.id},this)" style="width:100px" step="0.01"/></td>
@@ -589,6 +659,15 @@ async function deletePartida(pid, tipo, seccionId) {
 async function reloadSections() {
   const r = await api(`/api/proyecto/${PID}`);
   projectData = r;
+  
+  if (projectData.secciones && Array.isArray(projectData.secciones)) {
+      projectData.secciones.forEach(sec => {
+          if (sec.tipo !== 'mano_obra') { 
+              cargarMarcasPorCategoria(sec.codigo);
+          }
+      });
+  }
+  
   updateStatusBar();
 }
 

@@ -220,3 +220,70 @@ CREATE TABLE `usuarios` (
 LOCK TABLES `usuarios` WRITE;
 INSERT INTO `usuarios` VALUES (1,'admin@dematiq.com','$2y$10$8PTeSUxma61.VgTUNGrG2.CcZ2W3vBTshPyXScboMKqO8ruRxugKa','Administrador DEMATIQ','2026-05-27 18:55:01'),(2,'monse@dematiq.com','2e217432b4ef3fafa9511a29b893ddab658651ffff7ecf36f931cf8d22fcd17f','Alondra Monserrat','2026-06-19 15:44:56');
 UNLOCK TABLES;
+
+
+
+DROP TABLE IF EXISTS `catalogo_marcas`;
+CREATE TABLE `catalogo_marcas` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(100) NOT NULL,
+  `categoria` enum('control', 'electrico', 'neumatico', 'general') NOT NULL DEFAULT 'general',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `nombre_cat` (`nombre`, `categoria`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Aseguramos que la tabla esté limpia antes de insertar
+TRUNCATE TABLE `catalogo_marcas`;
+
+INSERT INTO `catalogo_marcas` (`nombre`, `categoria`) VALUES 
+-- Categoría: Control
+('Siemens', 'control'),
+('Allen-Bradley', 'control'),
+('Moeller', 'control'),
+('Autonics', 'control'),
+('IFM', 'control'),
+('Wenglor', 'control'),
+('Sick', 'control'),
+('Festo', 'control'),
+('SMC', 'control'),
+('Omron', 'control'),
+('Pepperl+Fuchs', 'control'),
+('Keyence', 'control'),
+('Pilz', 'control'),
+
+-- Categoría: Eléctrico
+('Moeller', 'electrico'),
+('Rittal', 'electrico'),
+('Siemens', 'electrico'),
+('Allen-Bradley', 'electrico'),
+('Omron', 'electrico'),
+('Schneider electric', 'electrico'),
+('Weimuller', 'electrico'),
+('Finder', 'electrico'),
+('Pilz', 'electrico'),
+('Keyence', 'electrico'),
+
+-- Categoría: Neumático
+('Festo', 'neumatico'),
+('SMC', 'neumatico'),
+('Asco Neumatics', 'neumatico'),
+('Parker', 'neumatico'),
+('Norgren', 'neumatico'),
+('Bosch Rexroth', 'neumatico'),
+
+-- Categoría: MO (Para componentes comunes)
+('PROGRAMADOR PLC', 'mano_obra'),
+('PROGRAMADOR HMI', 'mano_obra'),
+('PROGRAMADOR DE SERVOS', 'mano_obra'),
+('DISEÑO ELECTRICO', 'mano_obra'),
+('DISEÑO MECANICO', 'mano_obra'),
+('INSTALADOR ELECTRICO', 'mano_obra'),
+('ARMADO DE TABLEROS ELEC', 'mano_obra'),
+('MONTAJE MECANICO', 'mano_obra'),
+('INGENIERO DE SERVICIO', 'mano_obra'),
+('LEVANTAMIENTO PLANTA', 'mano_obra'),
+('PUESTO EN MARCHA PLANTA', 'mano_obra'),
+('PROGRAMACION DE S. VISION', 'mano_obra');
+
+

@@ -20,7 +20,7 @@ def favicon():
     return send_from_directory(os.path.join(app.root_path, "static"),
                                "favicon.ico", mimetype="image/x-icon")
 
-DB = dict(host="localhost", user="root", password="",
+DB = dict(host="localhost", user="root", password="root",
           database="cotizaciones_dematiq", charset="utf8mb4",
           cursorclass=pymysql.cursors.DictCursor, autocommit=True)
 
@@ -258,6 +258,21 @@ def api_get_proyecto(pid):
         secciones=[_serialize(s) for s in secciones],
         condiciones=list(condiciones)
     )
+
+
+@app.route("/api/marcas")
+@login_required
+def api_marcas():
+    categoria = request.args.get("categoria", "general")
+    
+    filas = q("""SELECT nombre FROM catalogo_marcas 
+                 WHERE categoria=%s OR categoria='general' 
+                 ORDER BY nombre ASC""", 
+              (categoria,))
+    
+    lista_marcas = [fila["nombre"] for fila in filas]
+    
+    return jsonify(marcas=lista_marcas)
 
 @app.route("/api/partidas/create", methods=["POST"])
 @login_required
